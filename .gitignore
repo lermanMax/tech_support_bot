@@ -1,0 +1,5 @@
+.DS_Store
+.idea/
+myvenv
+testing.py
+__pycache__/
