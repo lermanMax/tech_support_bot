@@ -58,7 +58,9 @@ class MarketBotData:
             insert_values = (tg_id, phone)
             insert_script = '''INSERT INTO customer (tg_id, phone)
                                 VALUES (%s, %s)
-                                ON CONFLICT (tg_id) DO NOTHING;'''
+                                ON CONFLICT (tg_id)
+                                DO UPDATE
+                                SET phone = EXCLUDED.phone;'''
             cursor.execute(insert_script, insert_values)
         connection.commit()
         connection.close()
@@ -220,19 +222,6 @@ class CustomerData:
     def last_name(self) -> str:
         return self.last_name
 
-    # надо? exceptions?
-    def change_phone(self, new_phone: str) -> None:
-        connection = psycopg2.connect(**db_config)
-        with connection.cursor() as cursor:
-            insert_values = (new_phone, self.customer_id)
-            update_script = '''UPDATE customer
-                                SET phone = %s
-                                WHERE customer_id = %s;'''
-            cursor.execute(update_script, insert_values)
-        connection.commit()
-        connection.close()
-
-    # exceptions?
     def change_first_name(self, new_first_name: str) -> None:
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
@@ -244,7 +233,6 @@ class CustomerData:
         connection.commit()
         connection.close()
 
-    # exceptions?
     def change_last_name(self, new_last_name: str) -> None:
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
