@@ -1,5 +1,4 @@
 import psycopg2
-from psycopg2 import extras
 from config import DB_HOST, DB_NAME, DB_USER, DB_PASS, DB_PORT
 
 db_config = {'host': DB_HOST,
@@ -8,8 +7,7 @@ db_config = {'host': DB_HOST,
              'password': DB_PASS,
              'port': DB_PORT}
 
-
-# not_found_err = NameError('db: tg_user not found')
+not_found_err = NameError('db: tg_user not found')
 
 
 class MarketBotData:
@@ -28,6 +26,21 @@ class MarketBotData:
         connection.close()
 
     @staticmethod
+    def does_user_exist(tg_id: int) -> bool:
+        connection = psycopg2.connect(**db_config)
+        with connection.cursor() as cursor:
+            select_script = '''
+                    SELECT exists(
+                       SELECT tg_id
+                       FROM tg_user
+                       WHERE tg_id = %s);'''
+            cursor.execute(select_script, (tg_id,))
+            exists, = cursor.fetchone()
+        connection.commit()
+        connection.close()
+        return exists
+
+    @staticmethod
     def add_operator(tg_id: int) -> None:
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
@@ -38,15 +51,26 @@ class MarketBotData:
         connection.commit()
         connection.close()
 
-    # intersect(works)? inner join (seems to be working)?
+    @staticmethod
+    def add_customer(tg_id: int, phone: str) -> None:
+        connection = psycopg2.connect(**db_config)
+        with connection.cursor() as cursor:
+            insert_values = (tg_id, phone)
+            insert_script = '''INSERT INTO customer (tg_id, phone)
+                                VALUES (%s, %s)
+                                ON CONFLICT (tg_id) DO NOTHING;'''
+            cursor.execute(insert_script, insert_values)
+        connection.commit()
+        connection.close()
+
     @staticmethod
     def get_customer_list() -> list:
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
             select_script = '''SELECT tg_user.tg_id FROM tg_user
-                                WHERE tg_user.is_banned = FALSE
-                                INTERSECT SELECT tg_id
-                                FROM customer;'''
+                                INNER JOIN customer 
+                                ON tg_user.tg_id = customer.tg_id
+                                WHERE tg_user.is_banned = FALSE;'''
             cursor.execute(select_script)
             try:
                 id_list = cursor.fetchall()
@@ -56,7 +80,6 @@ class MarketBotData:
         connection.close()
         return [id_tuple[0] for id_tuple in id_list]
 
-    # except(works)? left join(doesn't work)?
     @staticmethod
     def get_tg_users() -> list:
         connection = psycopg2.connect(**db_config)
@@ -73,13 +96,11 @@ class MarketBotData:
         connection.close()
         return [id_tuple[0] for id_tuple in id_list]
 
-    # +
     @staticmethod
     def get_ban_list() -> list:
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
-            select_script = '''SELECT tg_id
-                                FROM tg_user
+            select_script = '''SELECT tg_id FROM tg_user
                                 WHERE is_banned = TRUE;'''
             cursor.execute(select_script)
             try:
@@ -97,20 +118,25 @@ class TgUserData:
 
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
-            select_script = '''SELECT tg_username FROM tg_user 
+            select_script = '''SELECT tg_username, is_banned
+                                FROM tg_user 
                                 WHERE tg_id = %s;'''
             cursor.execute(select_script, (tg_id,))
-            select_username, = cursor.fetchone()
+            select_username, is_banned = cursor.fetchone()
         connection.commit()
         connection.close()
 
         self.tg_username = select_username
+        self.is_banned = is_banned
 
     def get_tg_id(self) -> int:
         return self.tg_id
 
     def get_tg_username(self) -> str:
         return self.tg_username
+
+    def is_banned(self) -> bool:
+        return self.is_banned
 
 
 class OperatorData:
@@ -129,37 +155,38 @@ class OperatorData:
 
         self.tg_id = tg_id
 
+    def get_tg_id(self):
+        return self.tg_id
+
     @staticmethod
     def ban(tg_id: int) -> None:
-        connection = psycopg2.connect(**db_config)
-        with connection.cursor() as cursor:
-            update_script = '''UPDATE tg_user
-                                SET is_banned = TRUE
-                                WHERE tg_id = %s
-                                RETURNING tg_id;'''
-            cursor.execute(update_script, (tg_id,))
-            try:
-                returning_tg_id, = cursor.fetchone()
-            except TypeError:
-                print('db: tg_user not found')
-        connection.commit()
-        connection.close()
+        if MarketBotData.does_user_exist(tg_id):
+            connection = psycopg2.connect(**db_config)
+            with connection.cursor() as cursor:
+                update_script = '''UPDATE tg_user
+                                    SET is_banned = TRUE
+                                    WHERE tg_id = %s
+                                    RETURNING tg_id;'''
+                cursor.execute(update_script, (tg_id,))
+            connection.commit()
+            connection.close()
+        else:
+            raise not_found_err
 
     @staticmethod
     def unban(tg_id: int) -> None:
-        connection = psycopg2.connect(**db_config)
-        with connection.cursor() as cursor:
-            update_script = '''UPDATE tg_user
-                                SET is_banned = FALSE
-                                WHERE tg_id = %s
-                                RETURNING tg_id;'''
-            cursor.execute(update_script, (tg_id,))
-            try:
-                returning_tg_id, = cursor.fetchone()
-            except TypeError:
-                print('db: tg_user not found')
-        connection.commit()
-        connection.close()
+        if MarketBotData.does_user_exist(tg_id):
+            connection = psycopg2.connect(**db_config)
+            with connection.cursor() as cursor:
+                update_script = '''UPDATE tg_user
+                                    SET is_banned = FALSE
+                                    WHERE tg_id = %s
+                                    RETURNING tg_id;'''
+                cursor.execute(update_script, (tg_id,))
+            connection.commit()
+            connection.close()
+        else:
+            raise not_found_err
 
 
 class CustomerData:
@@ -176,10 +203,13 @@ class CustomerData:
         connection.commit()
         connection.close()
 
-        self.tg_id = tg_id  # надо?
+        self.tg_id = tg_id
         self.phone = phone
         self.first_name = first_name
         self.last_name = last_name
+
+    def get_tg_id(self) -> int:
+        return self.tg_id
 
     def get_phone(self) -> str:
         return self.phone
@@ -196,13 +226,13 @@ class CustomerData:
         with connection.cursor() as cursor:
             insert_values = (new_phone, self.customer_id)
             update_script = '''UPDATE customer
-                                SET new_phone = %s
+                                SET phone = %s
                                 WHERE customer_id = %s;'''
             cursor.execute(update_script, insert_values)
         connection.commit()
         connection.close()
 
-    # надо? exceptions?
+    # exceptions?
     def change_first_name(self, new_first_name: str) -> None:
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
@@ -214,7 +244,7 @@ class CustomerData:
         connection.commit()
         connection.close()
 
-    # надо? exceptions?
+    # exceptions?
     def change_last_name(self, new_last_name: str) -> None:
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
