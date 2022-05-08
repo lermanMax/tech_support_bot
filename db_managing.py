@@ -8,6 +8,7 @@ db_config = {'host': DB_HOST,
              'port': DB_PORT}
 
 user_not_found_err = NameError('db: tg_user not found')
+msg_already_exists_err = NameError('db: support_chat_message already exists')
 
 
 class MarketBotData:
@@ -67,17 +68,34 @@ class MarketBotData:
 
     @staticmethod
     def add_message(tg_id: int, support_chat_message_id: int) -> None:
+        if MarketBotData.does_message_exist(support_chat_message_id):
+            raise msg_already_exists_err
+        else:
+            connection = psycopg2.connect(**db_config)
+            with connection.cursor() as cursor:
+                insert_values = (tg_id, support_chat_message_id)
+                insert_script = '''INSERT INTO message (tg_id, 
+                                                support_chat_message_id)
+                                    VALUES (%s, %s)
+                                    ON CONFLICT (support_chat_message_id)
+                                    DO NOTHING;'''
+                cursor.execute(insert_script, insert_values)
+            connection.commit()
+            connection.close()
+
+    @staticmethod
+    def does_message_exist(support_chat_message_id: int) -> bool:
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
-            insert_values = (tg_id, support_chat_message_id)
-            insert_script = '''INSERT INTO message (tg_id, 
-                                                    support_chat_message_id)
-                                VALUES (%s, %s)
-                                ON CONFLICT (support_chat_message_id)
-                                DO NOTHING;'''
-            cursor.execute(insert_script, insert_values)
+            select_script = '''SELECT exists(
+                                   SELECT support_chat_message_id
+                                   FROM message
+                                   WHERE support_chat_message_id = %s);'''
+            cursor.execute(select_script, (support_chat_message_id,))
+            exists, = cursor.fetchone()
         connection.commit()
         connection.close()
+        return exists
 
     @staticmethod
     def get_customer_list() -> list:
@@ -151,9 +169,18 @@ class TgUserData:
     def get_tg_username(self) -> str:
         return self._tg_username
 
-    # из бд?
     def is_banned(self) -> bool:
-        return self._is_banned
+        connection = psycopg2.connect(**db_config)
+        with connection.cursor() as cursor:
+            select_script = '''
+                        SELECT is_banned 
+                        FROM tg_user 
+                        WHERE tg_id = %s;'''
+            cursor.execute(select_script, (self._tg_id,))
+            is_banned, = cursor.fetchone()
+        connection.commit()
+        connection.close()
+        return is_banned
 
 
 class OperatorData:
@@ -286,7 +313,9 @@ class TextMessageData:
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
             select_script = '''
-                SELECT is_answered FROM message WHERE text_message_id = %s;'''
+                SELECT is_answered 
+                FROM message 
+                WHERE text_message_id = %s;'''
             cursor.execute(select_script, (self._text_message_id,))
             is_answered, = cursor.fetchone()
         connection.commit()
