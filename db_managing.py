@@ -7,7 +7,7 @@ db_config = {'host': DB_HOST,
              'password': DB_PASS,
              'port': DB_PORT}
 
-not_found_err = NameError('db: tg_user not found')
+user_not_found_err = NameError('db: tg_user not found')
 
 
 class MarketBotData:
@@ -66,6 +66,20 @@ class MarketBotData:
         connection.close()
 
     @staticmethod
+    def add_message(tg_id: int, support_chat_message_id: int) -> None:
+        connection = psycopg2.connect(**db_config)
+        with connection.cursor() as cursor:
+            insert_values = (tg_id, support_chat_message_id)
+            insert_script = '''INSERT INTO message (tg_id, 
+                                                    support_chat_message_id)
+                                VALUES (%s, %s)
+                                ON CONFLICT (support_chat_message_id)
+                                DO NOTHING;'''
+            cursor.execute(insert_script, insert_values)
+        connection.commit()
+        connection.close()
+
+    @staticmethod
     def get_customer_list() -> list:
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
@@ -116,7 +130,7 @@ class MarketBotData:
 
 class TgUserData:
     def __init__(self, tg_id: int):
-        self.tg_id = tg_id
+        self._tg_id = tg_id
 
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
@@ -128,23 +142,23 @@ class TgUserData:
         connection.commit()
         connection.close()
 
-        self.tg_username = select_username
-        self.is_banned = is_banned
+        self._tg_username = select_username
+        self._is_banned = is_banned
 
     def get_tg_id(self) -> int:
-        return self.tg_id
+        return self._tg_id
 
     def get_tg_username(self) -> str:
-        return self.tg_username
+        return self._tg_username
 
+    # из бд?
     def is_banned(self) -> bool:
-        return self.is_banned
+        return self._is_banned
 
 
 class OperatorData:
-
     def __init__(self, operator_id: int):
-        self.operator_id = operator_id
+        self._operator_id = operator_id
 
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
@@ -155,10 +169,10 @@ class OperatorData:
         connection.commit()
         connection.close()
 
-        self.tg_id = tg_id
+        self._tg_id = tg_id
 
     def get_tg_id(self):
-        return self.tg_id
+        return self._tg_id
 
     @staticmethod
     def ban(tg_id: int) -> None:
@@ -167,13 +181,12 @@ class OperatorData:
             with connection.cursor() as cursor:
                 update_script = '''UPDATE tg_user
                                     SET is_banned = TRUE
-                                    WHERE tg_id = %s
-                                    RETURNING tg_id;'''
+                                    WHERE tg_id = %s;'''
                 cursor.execute(update_script, (tg_id,))
             connection.commit()
             connection.close()
         else:
-            raise not_found_err
+            raise user_not_found_err
 
     @staticmethod
     def unban(tg_id: int) -> None:
@@ -182,18 +195,17 @@ class OperatorData:
             with connection.cursor() as cursor:
                 update_script = '''UPDATE tg_user
                                     SET is_banned = FALSE
-                                    WHERE tg_id = %s
-                                    RETURNING tg_id;'''
+                                    WHERE tg_id = %s;'''
                 cursor.execute(update_script, (tg_id,))
             connection.commit()
             connection.close()
         else:
-            raise not_found_err
+            raise user_not_found_err
 
 
 class CustomerData:
     def __init__(self, customer_id: int):
-        self.customer_id = customer_id
+        self._customer_id = customer_id
 
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
@@ -205,27 +217,27 @@ class CustomerData:
         connection.commit()
         connection.close()
 
-        self.tg_id = tg_id
-        self.phone = phone
-        self.first_name = first_name
-        self.last_name = last_name
+        self._tg_id = tg_id
+        self._phone = phone
+        self._first_name = first_name
+        self._last_name = last_name
 
     def get_tg_id(self) -> int:
-        return self.tg_id
+        return self._tg_id
 
     def get_phone(self) -> str:
-        return self.phone
+        return self._phone
 
-    def first_name(self) -> str:
-        return self.first_name
+    def get_first_name(self) -> str:
+        return self._first_name
 
-    def last_name(self) -> str:
-        return self.last_name
+    def get_last_name(self) -> str:
+        return self._last_name
 
     def change_first_name(self, new_first_name: str) -> None:
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
-            insert_values = (new_first_name, self.customer_id)
+            insert_values = (new_first_name, self._customer_id)
             update_script = '''UPDATE customer
                                 SET first_name = %s
                                 WHERE customer_id = %s;'''
@@ -236,10 +248,67 @@ class CustomerData:
     def change_last_name(self, new_last_name: str) -> None:
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
-            insert_values = (new_last_name, self.customer_id)
+            insert_values = (new_last_name, self._customer_id)
             update_script = '''UPDATE customer
                                 SET last_name = %s
                                 WHERE customer_id = %s;'''
             cursor.execute(update_script, insert_values)
+        connection.commit()
+        connection.close()
+
+
+class TextMessageData:
+    def __init__(self, text_message_id: int):
+        self._text_message_id = text_message_id
+
+        connection = psycopg2.connect(**db_config)
+        with connection.cursor() as cursor:
+            select_script = '''SELECT tg_id, support_chat_message_id, 
+                                        is_answered
+                                FROM message
+                                WHERE text_message_id = %s;'''
+            cursor.execute(select_script, (text_message_id,))
+            tg_id, support_chat_message_id, is_answered = cursor.fetchone()
+        connection.commit()
+        connection.close()
+
+        self._tg_id = tg_id
+        self._support_chat_message_id = support_chat_message_id
+        self._is_answered = is_answered
+
+    def get_tg_id(self) -> int:
+        return self._tg_id
+
+    def get_support_chat_message_id(self) -> str:
+        return self._support_chat_message_id
+
+    def is_answered(self) -> bool:
+        connection = psycopg2.connect(**db_config)
+        with connection.cursor() as cursor:
+            select_script = '''
+                SELECT is_answered FROM message WHERE text_message_id = %s;'''
+            cursor.execute(select_script, (self._text_message_id,))
+            is_answered, = cursor.fetchone()
+        connection.commit()
+        connection.close()
+        return is_answered
+
+    def mark_answered(self) -> None:
+        connection = psycopg2.connect(**db_config)
+        with connection.cursor() as cursor:
+            update_script = '''UPDATE message
+                                SET is_answered = TRUE
+                                WHERE text_message_id = %s;'''
+            cursor.execute(update_script, (self._text_message_id,))
+        connection.commit()
+        connection.close()
+
+    def mark_unanswered(self) -> None:
+        connection = psycopg2.connect(**db_config)
+        with connection.cursor() as cursor:
+            update_script = '''UPDATE message
+                                SET is_answered = FALSE
+                                WHERE text_message_id = %s;'''
+            cursor.execute(update_script, (self._text_message_id,))
         connection.commit()
         connection.close()
