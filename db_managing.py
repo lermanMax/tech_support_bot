@@ -76,9 +76,7 @@ class MarketBotData:
                 insert_values = (tg_id, support_chat_message_id)
                 insert_script = '''INSERT INTO message (tg_id, 
                                                 support_chat_message_id)
-                                    VALUES (%s, %s)
-                                    ON CONFLICT (support_chat_message_id)
-                                    DO NOTHING;'''
+                                    VALUES (%s, %s);'''
                 cursor.execute(insert_script, insert_values)
             connection.commit()
             connection.close()
