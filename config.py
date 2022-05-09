@@ -9,6 +9,10 @@ DB_USER = "bot"
 DB_PASS = "bot"
 DB_PORT = "5432"
 
+AIRTABLE_API_KEY = ''
+BASE_ID = ''
+TABLE_NAME = ''
+
 SUPERADMIN_PASS = ""
 
 TIMEZONE_SERVER = 3
