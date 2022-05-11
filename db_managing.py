@@ -11,7 +11,7 @@ user_not_found_err = NameError('db: tg_user not found')
 msg_already_exists_err = NameError('db: support_chat_message already exists')
 
 
-class MarketBotData:
+class SupportBotData:
     @staticmethod
     def add_tg_user(tg_id: int, tg_username: str) -> None:
         connection = psycopg2.connect(**db_config)
@@ -68,13 +68,13 @@ class MarketBotData:
 
     @staticmethod
     def add_message(tg_id: int, support_chat_message_id: int) -> None:
-        if MarketBotData.does_message_exist(support_chat_message_id):
+        if SupportBotData.does_message_exist(support_chat_message_id):
             raise msg_already_exists_err
         else:
             connection = psycopg2.connect(**db_config)
             with connection.cursor() as cursor:
                 insert_values = (tg_id, support_chat_message_id)
-                insert_script = '''INSERT INTO message (tg_id, 
+                insert_script = '''INSERT INTO message (tg_id,
                                                 support_chat_message_id)
                                     VALUES (%s, %s);'''
                 cursor.execute(insert_script, insert_values)
@@ -100,7 +100,7 @@ class MarketBotData:
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
             select_script = '''SELECT tg_user.tg_id FROM tg_user
-                                INNER JOIN customer 
+                                INNER JOIN customer
                                 ON tg_user.tg_id = customer.tg_id
                                 WHERE tg_user.is_banned = FALSE;'''
             cursor.execute(select_script)
@@ -151,7 +151,7 @@ class TgUserData:
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
             select_script = '''SELECT tg_username, is_banned
-                                FROM tg_user 
+                                FROM tg_user
                                 WHERE tg_id = %s;'''
             cursor.execute(select_script, (tg_id,))
             select_username, is_banned = cursor.fetchone()
@@ -171,8 +171,8 @@ class TgUserData:
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
             select_script = '''
-                        SELECT is_banned 
-                        FROM tg_user 
+                        SELECT is_banned
+                        FROM tg_user
                         WHERE tg_id = %s;'''
             cursor.execute(select_script, (self._tg_id,))
             is_banned, = cursor.fetchone()
@@ -187,7 +187,7 @@ class OperatorData:
 
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
-            select_script = '''SELECT tg_id FROM operator 
+            select_script = '''SELECT tg_id FROM operator
                                 WHERE operator_id = %s;'''
             cursor.execute(select_script, (operator_id,))
             tg_id, = cursor.fetchone()
@@ -201,7 +201,7 @@ class OperatorData:
 
     @staticmethod
     def ban(tg_id: int) -> None:
-        if MarketBotData.does_user_exist(tg_id):
+        if SupportBotData.does_user_exist(tg_id):
             connection = psycopg2.connect(**db_config)
             with connection.cursor() as cursor:
                 update_script = '''UPDATE tg_user
@@ -215,7 +215,7 @@ class OperatorData:
 
     @staticmethod
     def unban(tg_id: int) -> None:
-        if MarketBotData.does_user_exist(tg_id):
+        if SupportBotData.does_user_exist(tg_id):
             connection = psycopg2.connect(**db_config)
             with connection.cursor() as cursor:
                 update_script = '''UPDATE tg_user
@@ -288,7 +288,7 @@ class TextMessageData:
 
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
-            select_script = '''SELECT tg_id, support_chat_message_id, 
+            select_script = '''SELECT tg_id, support_chat_message_id,
                                         is_answered
                                 FROM message
                                 WHERE text_message_id = %s;'''
@@ -311,8 +311,8 @@ class TextMessageData:
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
             select_script = '''
-                SELECT is_answered 
-                FROM message 
+                SELECT is_answered
+                FROM message
                 WHERE text_message_id = %s;'''
             cursor.execute(select_script, (self._text_message_id,))
             is_answered, = cursor.fetchone()
