@@ -1,10 +1,7 @@
 API_TOKEN = ''
 
-GSHEET_SERVICE_FILE = ''
-BOT_MAILADDRESS = ''
-
 DB_HOST = "localhost"
-DB_NAME = "bot_test"
+DB_NAME = "support_db"
 DB_USER = "bot"
 DB_PASS = "bot"
 DB_PORT = "5432"
@@ -12,7 +9,3 @@ DB_PORT = "5432"
 AIRTABLE_API_KEY = ''
 BASE_ID = ''
 TABLE_NAME = ''
-
-SUPERADMIN_PASS = ""
-
-TIMEZONE_SERVER = 3
