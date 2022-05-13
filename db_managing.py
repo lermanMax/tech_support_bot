@@ -7,11 +7,21 @@ db_config = {'host': DB_HOST,
              'password': DB_PASS,
              'port': DB_PORT}
 
-user_not_found_err = Exception('db: tg_user not found')
-msg_already_exists_err = Exception('db: support_chat_message already exists')
-msg_not_found_err = Exception('db: support_chat_message not found')
-phone_already_exists_err = \
-    Exception('db: customer with given phone number already exists')
+
+class UserNotFound(Exception):
+    pass
+
+
+class MsgAlreadyExists(Exception):
+    pass
+
+
+class MsgNotFound(Exception):
+    pass
+
+
+class PhoneAlreadyExists(Exception):
+    pass
 
 
 class SupportBotData:
@@ -58,7 +68,8 @@ class SupportBotData:
     @staticmethod
     def add_customer(tg_id: int, phone: str) -> int:
         if SupportBotData.does_phone_exist(phone):
-            raise phone_already_exists_err
+            raise PhoneAlreadyExists(
+                'db: customer with given phone number already exists')
         else:
             connection = psycopg2.connect(**db_config)
             with connection.cursor() as cursor:
@@ -94,7 +105,7 @@ class SupportBotData:
     @staticmethod
     def add_message(tg_id: int, support_chat_message_id: int) -> None:
         if SupportBotData.does_message_exist(support_chat_message_id):
-            raise msg_already_exists_err
+            raise MsgAlreadyExists('db: support_chat_message already exists')
         else:
             connection = psycopg2.connect(**db_config)
             with connection.cursor() as cursor:
@@ -135,7 +146,7 @@ class SupportBotData:
             connection.close()
             return text_message_id
         else:
-            raise msg_not_found_err
+            raise MsgNotFound('db: support_chat_message not found')
 
     @staticmethod
     def get_customer_id(tg_id: int) -> int:
@@ -152,7 +163,7 @@ class SupportBotData:
             connection.close()
             return customer_id
         else:
-            raise user_not_found_err
+            raise UserNotFound('db: tg_user not found')
 
     @staticmethod
     def get_customer_list() -> list:
@@ -270,7 +281,7 @@ class OperatorData:
             connection.commit()
             connection.close()
         else:
-            raise user_not_found_err
+            raise UserNotFound('db: tg_user not found')
 
     @staticmethod
     def unban(tg_id: int) -> None:
@@ -284,7 +295,7 @@ class OperatorData:
             connection.commit()
             connection.close()
         else:
-            raise user_not_found_err
+            raise UserNotFound('db: tg_user not found')
 
 
 class CustomerData:
