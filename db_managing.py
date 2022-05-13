@@ -9,7 +9,9 @@ db_config = {'host': DB_HOST,
 
 user_not_found_err = NameError('db: tg_user not found')
 msg_already_exists_err = NameError('db: support_chat_message already exists')
-msg_doesnt_exists_err = NameError('db: support_chat_message does not exist')
+msg_not_found_err = NameError('db: support_chat_message not found')
+phone_already_exists_err = \
+    NameError('db: customer with given phone number already exists')
 
 
 class SupportBotData:
@@ -55,21 +57,39 @@ class SupportBotData:
 
     @staticmethod
     def add_customer(tg_id: int, phone: str) -> int:
+        if SupportBotData.does_phone_exist(phone):
+            raise phone_already_exists_err
+        else:
+            connection = psycopg2.connect(**db_config)
+            with connection.cursor() as cursor:
+                insert_values = (tg_id, phone)
+                insert_script = '''
+                    INSERT INTO customer (tg_id, phone)
+                    VALUES (%s, %s)
+                    ON CONFLICT (tg_id)
+                    DO UPDATE
+                    SET phone = EXCLUDED.phone
+                    RETURNING customer_id;'''
+                cursor.execute(insert_script, insert_values)
+                customer_id, = cursor.fetchone()
+            connection.commit()
+            connection.close()
+        return customer_id
+
+    @staticmethod
+    def does_phone_exist(phone: str) -> bool:
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
-            insert_values = (tg_id, phone)
-            insert_script = '''
-                INSERT INTO customer (tg_id, phone)
-                VALUES (%s, %s)
-                ON CONFLICT (tg_id)
-                DO UPDATE
-                SET phone = EXCLUDED.phone
-                RETURNING customer_id;'''
-            cursor.execute(insert_script, insert_values)
-            customer_id, = cursor.fetchone()
+            select_script = '''
+                SELECT exists(
+                   SELECT phone
+                   FROM customer
+                   WHERE phone = %s);'''
+            cursor.execute(select_script, (phone,))
+            exists, = cursor.fetchone()
         connection.commit()
         connection.close()
-        return customer_id
+        return exists
 
     @staticmethod
     def add_message(tg_id: int, support_chat_message_id: int) -> None:
@@ -105,18 +125,34 @@ class SupportBotData:
         if SupportBotData.does_message_exist(support_chat_message_id):
             connection = psycopg2.connect(**db_config)
             with connection.cursor() as cursor:
-                insert_values = (support_chat_message_id,)
                 insert_script = '''
                     SELECT text_message_id
                     FROM message
                     WHERE support_chat_message_id = %s;'''
-                cursor.execute(insert_script, insert_values)
+                cursor.execute(insert_script, (support_chat_message_id,))
                 text_message_id, = cursor.fetchone()
             connection.commit()
             connection.close()
             return text_message_id
         else:
-            raise msg_doesnt_exists_err
+            raise msg_not_found_err
+
+    @staticmethod
+    def get_customer_id(tg_id: int) -> int:
+        if SupportBotData.does_user_exist(tg_id):
+            connection = psycopg2.connect(**db_config)
+            with connection.cursor() as cursor:
+                insert_script = '''
+                    SELECT customer_id
+                    FROM customer
+                    WHERE tg_id = %s;'''
+                cursor.execute(insert_script, (tg_id,))
+                customer_id, = cursor.fetchone()
+            connection.commit()
+            connection.close()
+            return customer_id
+        else:
+            raise user_not_found_err
 
     @staticmethod
     def get_customer_list() -> list:
