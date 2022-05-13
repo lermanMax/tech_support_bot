@@ -9,6 +9,7 @@ db_config = {'host': DB_HOST,
 
 user_not_found_err = NameError('db: tg_user not found')
 msg_already_exists_err = NameError('db: support_chat_message already exists')
+msg_doesnt_exists_err = NameError('db: support_chat_message does not exist')
 
 
 class SupportBotData:
@@ -98,6 +99,24 @@ class SupportBotData:
         connection.commit()
         connection.close()
         return exists
+
+    @staticmethod
+    def get_textmessage_id(support_chat_message_id: int) -> int:
+        if SupportBotData.does_message_exist(support_chat_message_id):
+            connection = psycopg2.connect(**db_config)
+            with connection.cursor() as cursor:
+                insert_values = (support_chat_message_id,)
+                insert_script = '''
+                    SELECT text_message_id
+                    FROM message
+                    WHERE support_chat_message_id = %s;'''
+                cursor.execute(insert_script, insert_values)
+                text_message_id, = cursor.fetchone()
+            connection.commit()
+            connection.close()
+            return text_message_id
+        else:
+            raise msg_doesnt_exists_err
 
     @staticmethod
     def get_customer_list() -> list:
