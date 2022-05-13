@@ -7,11 +7,11 @@ db_config = {'host': DB_HOST,
              'password': DB_PASS,
              'port': DB_PORT}
 
-user_not_found_err = NameError('db: tg_user not found')
-msg_already_exists_err = NameError('db: support_chat_message already exists')
-msg_not_found_err = NameError('db: support_chat_message not found')
+user_not_found_err = Exception('db: tg_user not found')
+msg_already_exists_err = Exception('db: support_chat_message already exists')
+msg_not_found_err = Exception('db: support_chat_message not found')
 phone_already_exists_err = \
-    NameError('db: customer with given phone number already exists')
+    Exception('db: customer with given phone number already exists')
 
 
 class SupportBotData:
