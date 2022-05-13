@@ -3,7 +3,7 @@ from collections import defaultdict
 import logging
 
 from db_managing import CustomerData, OperatorData, SupportBotData,\
-    TgUserData,  TextMessageData, user_not_found_err
+    TgUserData,  TextMessageData
 
 
 # Configure logging
@@ -69,6 +69,12 @@ class SupportBot():
         ban_tg_ids = self.support_bot_data.get_ban_list()
         return ban_tg_ids
 
+    def get_textmessage_by(self, support_chat_message_id: int) -> TextMessage:
+        return TextMessage(1)
+
+    def get_customer_by_tg_id(self, tg_id: int) -> Customer:
+        return Customer(1)
+
 
 class TgUser(CacheMixin):
     def __init__(self, tg_id: int):
@@ -99,18 +105,20 @@ class Operator(TgUser):
     def get_tg_id(self):
         return self.operator_data.get_tg_id()
 
-    def ban(self, tg_id: int) -> None:
+    @staticmethod
+    def ban(tg_id: int) -> None:
         try:
-            self.operator_data.ban(tg_id)
+            OperatorData.ban(tg_id)
             log.info(f'tg_user going to the ban: {tg_id}')
-        except user_not_found_err:
+        except NameError:
             log.error(f'tg_user_not_found: {tg_id}')
 
-    def unban(self, tg_id: int) -> None:
+    @staticmethod
+    def unban(tg_id: int) -> None:
         try:
-            self.operator_data.unban(tg_id)
+            OperatorData.unban(tg_id)
             log.info(f'tg_user was unbaned: {tg_id}')
-        except user_not_found_err:
+        except NameError:
             log.error(f'tg_user_not_found: {tg_id}')
 
 
@@ -150,6 +158,9 @@ class TextMessage(CacheMixin):
 
     def get_tg_id(self) -> int:
         return self.text_message_data.get_tg_id()
+
+    def get_tg_user(self) -> TgUser:
+        return TgUser.get(self.get_tg_id())
 
     def get_support_chat_message_id(self) -> str:
         return self.text_message_data.get_support_chat_message_id()

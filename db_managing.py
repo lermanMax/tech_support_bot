@@ -53,18 +53,22 @@ class SupportBotData:
         connection.close()
 
     @staticmethod
-    def add_customer(tg_id: int, phone: str) -> None:
+    def add_customer(tg_id: int, phone: str) -> int:
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
             insert_values = (tg_id, phone)
-            insert_script = '''INSERT INTO customer (tg_id, phone)
-                                VALUES (%s, %s)
-                                ON CONFLICT (tg_id)
-                                DO UPDATE
-                                SET phone = EXCLUDED.phone;'''
+            insert_script = '''
+                INSERT INTO customer (tg_id, phone)
+                VALUES (%s, %s)
+                ON CONFLICT (tg_id)
+                DO UPDATE
+                SET phone = EXCLUDED.phone
+                RETURNING customer_id;'''
             cursor.execute(insert_script, insert_values)
+            customer_id, = cursor.fetchone()
         connection.commit()
         connection.close()
+        return customer_id
 
     @staticmethod
     def add_message(tg_id: int, support_chat_message_id: int) -> None:
@@ -74,9 +78,9 @@ class SupportBotData:
             connection = psycopg2.connect(**db_config)
             with connection.cursor() as cursor:
                 insert_values = (tg_id, support_chat_message_id)
-                insert_script = '''INSERT INTO message (tg_id,
-                                                support_chat_message_id)
-                                    VALUES (%s, %s);'''
+                insert_script = '''
+                    INSERT INTO message (tg_id, support_chat_message_id)
+                    VALUES (%s, %s);'''
                 cursor.execute(insert_script, insert_values)
             connection.commit()
             connection.close()
@@ -234,9 +238,10 @@ class CustomerData:
 
         connection = psycopg2.connect(**db_config)
         with connection.cursor() as cursor:
-            select_script = '''SELECT tg_id, phone, first_name, last_name
-                                FROM customer
-                                WHERE customer_id = %s;'''
+            select_script = '''
+                SELECT tg_id, phone, first_name, last_name
+                FROM customer
+                WHERE customer_id = %s;'''
             cursor.execute(select_script, (customer_id,))
             tg_id, phone, first_name, last_name = cursor.fetchone()
         connection.commit()
