@@ -3,7 +3,9 @@ from collections import defaultdict
 import logging
 
 from db_managing import CustomerData, OperatorData, SupportBotData,\
-    TgUserData,  TextMessageData
+    TgUserData,  TextMessageData, UserNotFound, PhoneAlreadyExists,\
+    CustomerNotFound, MsgNotFound
+from airtable_db import PhoneNotFound, find_name_by_phone_test
 
 
 # Configure logging
@@ -11,7 +13,11 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger('busines_logic')
 
 
-class NotEnoughMoney(Exception):
+class UserNotFoundOnSite(Exception):
+    pass
+
+
+class PhoneAlreadyBelongsCustomer(Exception):
     pass
 
 
@@ -46,8 +52,34 @@ class SupportBot():
         )
 
     def add_customer(self, tg_id: int, phone: str) -> Customer:
-        customer_id = self.support_bot_data.add_customer(tg_id, phone)
-        customer = Customer(customer_id)
+        """_summary_
+
+        Args:
+            tg_id (int): _description_
+            phone (str): _description_
+
+        Raises:
+            UserNotFoundOnSite: Юзер не зарегистрирован на сайте
+            PhoneAlreadyBelongsCustomer:
+                Уже есть другой пользователь с этим номером
+
+        Returns:
+            Customer: _description_
+        """
+        try:
+            name = find_name_by_phone_test(phone=phone)  # test !!!
+        except PhoneNotFound:
+            raise UserNotFoundOnSite('phone not found')
+
+        try:
+            customer_id = self.support_bot_data.add_customer(tg_id, phone)
+            customer = Customer(customer_id)
+        except PhoneAlreadyExists:
+            customer = self.get_customer_by_tg_id(tg_id)
+            if not customer:
+                raise PhoneAlreadyBelongsCustomer()
+
+        customer.change_first_name(name)
         return customer
 
     def add_textmessage(self, tg_id: int, support_chat_message_id: int):
@@ -69,11 +101,26 @@ class SupportBot():
         ban_tg_ids = self.support_bot_data.get_ban_list()
         return ban_tg_ids
 
-    def get_textmessage_by(self, support_chat_message_id: int) -> TextMessage:
-        return TextMessage(1)
+    def get_textmessage_by(
+                self, support_chat_message_id: int) -> TextMessage | None:
+        try:
+            textmsg_id = self.support_bot_data.get_textmessage_id(
+                support_chat_message_id=support_chat_message_id
+            )
+            return TextMessage.get(textmsg_id)
+        except MsgNotFound:
+            return None
 
-    def get_customer_by_tg_id(self, tg_id: int) -> Customer:
-        return Customer(1)
+    def get_customer_by_tg_id(self, tg_id: int) -> Customer | None:
+        try:
+            customer_id = self.support_bot_data.get_customer_id(tg_id)
+            return Customer.get(customer_id)
+        except CustomerNotFound:
+            log.error('customer not found')
+            return None
+        except UserNotFound:
+            log.error('tg_id not found')
+            return None
 
 
 class TgUser(CacheMixin):
@@ -110,7 +157,7 @@ class Operator(TgUser):
         try:
             OperatorData.ban(tg_id)
             log.info(f'tg_user going to the ban: {tg_id}')
-        except NameError:
+        except UserNotFound:
             log.error(f'tg_user_not_found: {tg_id}')
 
     @staticmethod
@@ -118,7 +165,7 @@ class Operator(TgUser):
         try:
             OperatorData.unban(tg_id)
             log.info(f'tg_user was unbaned: {tg_id}')
-        except NameError:
+        except UserNotFound:
             log.error(f'tg_user_not_found: {tg_id}')
 
 

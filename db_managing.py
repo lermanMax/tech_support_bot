@@ -12,6 +12,10 @@ class UserNotFound(Exception):
     pass
 
 
+class CustomerNotFound(Exception):
+    pass
+
+
 class MsgAlreadyExists(Exception):
     pass
 
@@ -158,7 +162,11 @@ class SupportBotData:
                     FROM customer
                     WHERE tg_id = %s;'''
                 cursor.execute(insert_script, (tg_id,))
-                customer_id, = cursor.fetchone()
+                result = cursor.fetchone()
+                if result:
+                    customer_id, = result
+                else:
+                    raise CustomerNotFound('db: customer_id not found')
             connection.commit()
             connection.close()
             return customer_id
