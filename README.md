@@ -1,10 +1,10 @@
-# tech_support_bot
+# Tech Support Bot
 
-Решение для организации технической поддержки через бота.
+Organisation of Technical support using a Telegram bot
 
-Принцып работы
-1. Сообщения пользователей попадают в общий чат техподдержки.
-2. Свободный оператор может ответить на обращение.
-3. Бот отправит ответ обратно пользователю
+Operating Principles:
+1. User messages are sent to the technical support chat
+2. Available operator can respond to the request
+3. The bot sends the reply back to the user
 
-Доступно добавление в черный лист.
+Blacklisting is available
